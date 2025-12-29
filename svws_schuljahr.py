@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 MariaDB Database Connection Module
 Provides connection management for MariaDB 11+ databases
