@@ -1290,6 +1290,83 @@ def increment_schueler_einzelleistungen_datum(db: MariaDBConnection, do_commit: 
             logger.error(f"Failed to rollback transaction: {rollback_error}")
         return False
 
+
+def increment_lehrer_dates(db: MariaDBConnection, do_commit: bool = True) -> bool:
+    """
+    Increment date fields in the K_Lehrer table by 1 year (if not NULL).
+    
+    Fields incremented:
+    - Geburtsdatum
+    - DatumZugang
+    - DatumAbgang
+
+    Args:
+        db: MariaDBConnection instance (must be connected)
+        do_commit: If True, commits the transaction; if False, leaves it open for orchestrator
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not db or not db.connection:
+        logger.error("No active database connection")
+        return False
+
+    try:
+        count_query = "SELECT COUNT(*) FROM K_Lehrer"
+        count_result = db.execute_query(count_query)
+        total_records = count_result[0][0] if count_result else 0
+        logger.info(f"Processing {total_records} records in K_Lehrer table")
+
+        update_query = (
+            "UPDATE K_Lehrer "
+            "SET "
+            "Geburtsdatum = IF(Geburtsdatum IS NOT NULL, DATE_ADD(Geburtsdatum, INTERVAL 1 YEAR), NULL), "
+            "DatumZugang = IF(DatumZugang IS NOT NULL, DATE_ADD(DatumZugang, INTERVAL 1 YEAR), NULL), "
+            "DatumAbgang = IF(DatumAbgang IS NOT NULL, DATE_ADD(DatumAbgang, INTERVAL 1 YEAR), NULL)"
+        )
+        logger.info("Incrementing K_Lehrer date fields (Geburtsdatum, DatumZugang, DatumAbgang) by 1 year where not NULL")
+
+        affected_rows = db.execute_update(update_query)
+
+        if affected_rows is not None:
+            logger.info(f"Updated {affected_rows} K_Lehrer records")
+
+            sample_query = """
+                SELECT ID, Geburtsdatum, DatumZugang, DatumAbgang
+                FROM K_Lehrer
+                WHERE Geburtsdatum IS NOT NULL OR DatumZugang IS NOT NULL OR DatumAbgang IS NOT NULL
+                LIMIT 5
+            """
+            sample_result = db.execute_query(sample_query)
+            if sample_result:
+                logger.info("Sample of updated K_Lehrer records:")
+                for row in sample_result:
+                    logger.info(f"  ID: {row[0]}, Geburtsdatum: {row[1]}, DatumZugang: {row[2]}, DatumAbgang: {row[3]}")
+        else:
+            logger.error("Failed to update date fields in K_Lehrer")
+            return False
+
+        if do_commit:
+            if db.commit():
+                logger.info("Successfully incremented date fields in K_Lehrer table")
+                return True
+            else:
+                logger.error("Failed to commit transaction")
+                return False
+        else:
+            logger.info("Skipping commit (dry-run mode)")
+            return True
+
+    except Exception as e:
+        logger.error(f"Error incrementing K_Lehrer dates: {e}")
+        try:
+            db.rollback()
+            logger.info("Transaction rolled back")
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback transaction: {rollback_error}")
+        return False
+
+
 def get_available_steps() -> List[Tuple[str, Any]]:
     """
     Return the list of available orchestrated steps as (key, function) tuples.
@@ -1308,6 +1385,7 @@ def get_available_steps() -> List[Tuple[str, Any]]:
         ("schueler_merkmale_dates", increment_schueler_merkmale_dates),
         ("schueler_foerderempfehlungen_dates", increment_schueler_foerderempfehlungen_dates),
         ("schueler_allgadr_dates", increment_schueler_allgadr_dates),
+        ("lehrer_dates", increment_lehrer_dates),
     ]
 
 

@@ -258,6 +258,7 @@ with MariaDBConnection(host="localhost", user="root", password="password", datab
 - `schueler_merkmale_dates`
 - `schueler_foerderempfehlungen_dates`
 - `schueler_allgadr_dates`
+- `lehrer_dates`
 
 **Beispiel (Dry-Run):**
 
@@ -341,6 +342,20 @@ print("OK" if ok else "Fehler")
 - Nutzt `DATE_ADD(..., INTERVAL 1 YEAR)`
 - NULL-sicher (NULL bleibt NULL)
 - Liefert Beispielwerte im Log zur Verifikation
+
+### K_Lehrer – Datumsfelder (Date) Inkrementierung
+
+`increment_lehrer_dates(db, do_commit=True)`: Erhöht Datumsfelder in der Tabelle `K_Lehrer` um 1 Jahr (nur wenn nicht NULL).
+
+**Betroffene Spalten:**
+- Geburtsdatum
+- DatumZugang
+- DatumAbgang
+
+**Eigenschaften:**
+- Nutzt `DATE_ADD(..., INTERVAL 1 YEAR)`
+- NULL-sicher (NULL bleibt NULL)
+- Bulk-Update aller drei Felder mit Beispiel-Logging
 
 ## Logging
 
