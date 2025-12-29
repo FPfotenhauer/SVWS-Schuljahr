@@ -277,7 +277,7 @@ def create_connection_from_env() -> Optional[MariaDBConnection]:
     )
 
 
-def increment_schuljahresabschnitte_jahr(db: MariaDBConnection) -> bool:
+def increment_schuljahresabschnitte_jahr(db: MariaDBConnection, do_commit: bool = True) -> bool:
     """
     Increment the Jahr (year) column in Schuljahresabschnitte table by 1.
     Processes years in descending order to avoid unique constraint violations.
@@ -327,12 +327,16 @@ def increment_schuljahresabschnitte_jahr(db: MariaDBConnection) -> bool:
                 return False
         
         # Commit the transaction
-        if db.commit():
-            logger.info("Successfully incremented all years in Schuljahresabschnitte")
-            return True
+        if do_commit:
+            if db.commit():
+                logger.info("Successfully incremented all years in Schuljahresabschnitte")
+                return True
+            else:
+                logger.error("Failed to commit transaction")
+                return False
         else:
-            logger.error("Failed to commit transaction")
-            return False
+            logger.info("Skipping commit (dry-run mode)")
+            return True
             
     except Exception as e:
         logger.error(f"Error incrementing Schuljahresabschnitte: {e}")
@@ -344,7 +348,7 @@ def increment_schuljahresabschnitte_jahr(db: MariaDBConnection) -> bool:
         return False
 
 
-def increment_schueler_dates(db: MariaDBConnection) -> bool:
+def increment_schueler_dates(db: MariaDBConnection, do_commit: bool = True) -> bool:
     """
     Increment all date fields in the Schueler table by 1 year.
     
@@ -424,12 +428,16 @@ def increment_schueler_dates(db: MariaDBConnection) -> bool:
             return False
         
         # Commit the transaction
-        if db.commit():
-            logger.info("Successfully incremented all date fields in Schueler table")
-            return True
+        if do_commit:
+            if db.commit():
+                logger.info("Successfully incremented all date fields in Schueler table")
+                return True
+            else:
+                logger.error("Failed to commit transaction")
+                return False
         else:
-            logger.error("Failed to commit transaction")
-            return False
+            logger.info("Skipping commit (dry-run mode)")
+            return True
             
     except Exception as e:
         logger.error(f"Error incrementing Schueler dates: {e}")
@@ -441,7 +449,7 @@ def increment_schueler_dates(db: MariaDBConnection) -> bool:
         return False
 
 
-def increment_schueler_abschlussdatum(db: MariaDBConnection) -> bool:
+def increment_schueler_abschlussdatum(db: MariaDBConnection, do_commit: bool = True) -> bool:
     """
     Increment the Abschlussdatum field in Schueler table by 1 year.
     
@@ -512,12 +520,16 @@ def increment_schueler_abschlussdatum(db: MariaDBConnection) -> bool:
             return False
         
         # Commit the transaction
-        if db.commit():
-            logger.info("Successfully incremented Abschlussdatum in Schueler table")
-            return True
+        if do_commit:
+            if db.commit():
+                logger.info("Successfully incremented Abschlussdatum in Schueler table")
+                return True
+            else:
+                logger.error("Failed to commit transaction")
+                return False
         else:
-            logger.error("Failed to commit transaction")
-            return False
+            logger.info("Skipping commit (dry-run mode)")
+            return True
             
     except Exception as e:
         logger.error(f"Error incrementing Abschlussdatum: {e}")
@@ -529,7 +541,7 @@ def increment_schueler_abschlussdatum(db: MariaDBConnection) -> bool:
         return False
 
 
-def increment_schueler_year_fields(db: MariaDBConnection) -> bool:
+def increment_schueler_year_fields(db: MariaDBConnection, do_commit: bool = True) -> bool:
     """
     Increment integer year fields in the Schueler table by 1.
     
@@ -596,12 +608,16 @@ def increment_schueler_year_fields(db: MariaDBConnection) -> bool:
             return False
         
         # Commit the transaction
-        if db.commit():
-            logger.info("Successfully incremented all year fields in Schueler table")
-            return True
+        if do_commit:
+            if db.commit():
+                logger.info("Successfully incremented all year fields in Schueler table")
+                return True
+            else:
+                logger.error("Failed to commit transaction")
+                return False
         else:
-            logger.error("Failed to commit transaction")
-            return False
+            logger.info("Skipping commit (dry-run mode)")
+            return True
             
     except Exception as e:
         logger.error(f"Error incrementing Schueler year fields: {e}")
@@ -613,13 +629,346 @@ def increment_schueler_year_fields(db: MariaDBConnection) -> bool:
         return False
 
 
+def increment_schueler_abgaenge_dates(db: MariaDBConnection, do_commit: bool = True) -> bool:
+    """
+    Increment date fields in the SchuelerAbgaenge table by 1 year.
+
+    Updates the following date columns:
+    - LSSchulEntlassDatum
+    - LSBeginnDatum
+
+    Args:
+        db: MariaDBConnection instance (must be connected)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not db or not db.connection:
+        logger.error("No active database connection")
+        return False
+
+    date_fields = [
+        "LSSchulEntlassDatum",
+        "LSBeginnDatum",
+    ]
+
+    try:
+        count_query = "SELECT COUNT(*) FROM SchuelerAbgaenge"
+        count_result = db.execute_query(count_query)
+        total_records = count_result[0][0] if count_result else 0
+        logger.info(f"Processing {total_records} records in SchuelerAbgaenge table")
+
+        set_clauses = [
+            f"{field} = IF({field} IS NOT NULL, DATE_ADD({field}, INTERVAL 1 YEAR), NULL)"
+            for field in date_fields
+        ]
+
+        update_query = f"UPDATE SchuelerAbgaenge SET {', '.join(set_clauses)}"
+        logger.info(f"Incrementing {len(date_fields)} SchuelerAbgaenge date fields by 1 year")
+
+        affected_rows = db.execute_update(update_query)
+
+        if affected_rows is not None:
+            logger.info(f"Updated {affected_rows} SchuelerAbgaenge records")
+
+            sample_query = """
+                SELECT ID, LSSchulEntlassDatum, LSBeginnDatum
+                FROM SchuelerAbgaenge
+                LIMIT 5
+            """
+            sample_result = db.execute_query(sample_query)
+            if sample_result:
+                logger.info("Sample of updated SchuelerAbgaenge records:")
+                for row in sample_result:
+                    logger.info(
+                        f"  ID: {row[0]}, LSSchulEntlassDatum: {row[1]}, LSBeginnDatum: {row[2]}"
+                    )
+        else:
+            logger.error("Failed to update SchuelerAbgaenge date fields")
+            return False
+
+        if do_commit:
+            if db.commit():
+                logger.info("Successfully incremented date fields in SchuelerAbgaenge table")
+                return True
+            else:
+                logger.error("Failed to commit transaction")
+                return False
+        else:
+            logger.info("Skipping commit (dry-run mode)")
+            return True
+
+    except Exception as e:
+        logger.error(f"Error incrementing SchuelerAbgaenge dates: {e}")
+        try:
+            db.rollback()
+            logger.info("Transaction rolled back")
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback transaction: {rollback_error}")
+        return False
+
+
+def increment_schueler_lernabschnittsdaten_dates(db: MariaDBConnection, do_commit: bool = True) -> bool:
+    """
+    Increment date fields in the SchuelerLernabschnittsdaten table by 1 year.
+
+    Updates the following date columns:
+    - DatumVon
+    - DatumBis
+    - Konferenzdatum
+    - Zeugnisdatum
+    - NPV_Datum
+    - NPAA_Datum
+    - NPBQ_Datum
+    - DatumFHR
+
+    Args:
+        db: MariaDBConnection instance (must be connected)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not db or not db.connection:
+        logger.error("No active database connection")
+        return False
+
+    date_fields = [
+        "DatumVon",
+        "DatumBis",
+        "Konferenzdatum",
+        "Zeugnisdatum",
+        "NPV_Datum",
+        "NPAA_Datum",
+        "NPBQ_Datum",
+        "DatumFHR",
+    ]
+
+    try:
+        count_query = "SELECT COUNT(*) FROM SchuelerLernabschnittsdaten"
+        count_result = db.execute_query(count_query)
+        total_records = count_result[0][0] if count_result else 0
+        logger.info(f"Processing {total_records} records in SchuelerLernabschnittsdaten table")
+
+        set_clauses = [
+            f"{field} = IF({field} IS NOT NULL, DATE_ADD({field}, INTERVAL 1 YEAR), NULL)"
+            for field in date_fields
+        ]
+
+        update_query = f"UPDATE SchuelerLernabschnittsdaten SET {', '.join(set_clauses)}"
+        logger.info(f"Incrementing {len(date_fields)} SchuelerLernabschnittsdaten date fields by 1 year")
+
+        affected_rows = db.execute_update(update_query)
+
+        if affected_rows is not None:
+            logger.info(f"Updated {affected_rows} SchuelerLernabschnittsdaten records")
+
+            sample_query = """
+                SELECT ID, DatumVon, DatumBis, Zeugnisdatum
+                FROM SchuelerLernabschnittsdaten
+                LIMIT 5
+            """
+            sample_result = db.execute_query(sample_query)
+            if sample_result:
+                logger.info("Sample of updated SchuelerLernabschnittsdaten records:")
+                for row in sample_result:
+                    logger.info(
+                        f"  ID: {row[0]}, DatumVon: {row[1]}, DatumBis: {row[2]}, Zeugnisdatum: {row[3]}"
+                    )
+        else:
+            logger.error("Failed to update SchuelerLernabschnittsdaten date fields")
+            return False
+
+        if do_commit:
+            if db.commit():
+                logger.info("Successfully incremented date fields in SchuelerLernabschnittsdaten table")
+                return True
+            else:
+                logger.error("Failed to commit transaction")
+                return False
+        else:
+            logger.info("Skipping commit (dry-run mode)")
+            return True
+
+    except Exception as e:
+        logger.error(f"Error incrementing SchuelerLernabschnittsdaten dates: {e}")
+        try:
+            db.rollback()
+            logger.info("Transaction rolled back")
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback transaction: {rollback_error}")
+        return False
+
+
+def increment_schueler_leistungsdaten_warndatum(db: MariaDBConnection, do_commit: bool = True) -> bool:
+    """
+    Increment the Warndatum field in the SchuelerLeistungsdaten table by 1 year (if not NULL).
+
+    Args:
+        db: MariaDBConnection instance (must be connected)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not db or not db.connection:
+        logger.error("No active database connection")
+        return False
+
+    try:
+        count_query = "SELECT COUNT(*) FROM SchuelerLeistungsdaten"
+        count_result = db.execute_query(count_query)
+        total_records = count_result[0][0] if count_result else 0
+        logger.info(f"Processing {total_records} records in SchuelerLeistungsdaten table")
+
+        update_query = (
+            "UPDATE SchuelerLeistungsdaten "
+            "SET Warndatum = IF(Warndatum IS NOT NULL, DATE_ADD(Warndatum, INTERVAL 1 YEAR), NULL)"
+        )
+        logger.info("Incrementing Warndatum by 1 year where not NULL")
+
+        affected_rows = db.execute_update(update_query)
+
+        if affected_rows is not None:
+            logger.info(f"Updated {affected_rows} SchuelerLeistungsdaten records")
+
+            sample_query = """
+                SELECT ID, Warndatum
+                FROM SchuelerLeistungsdaten
+                WHERE Warndatum IS NOT NULL
+                LIMIT 5
+            """
+            sample_result = db.execute_query(sample_query)
+            if sample_result:
+                logger.info("Sample of updated SchuelerLeistungsdaten:")
+                for row in sample_result:
+                    logger.info(f"  ID: {row[0]}, Warndatum: {row[1]}")
+        else:
+            logger.error("Failed to update Warndatum in SchuelerLeistungsdaten")
+            return False
+
+        if do_commit:
+            if db.commit():
+                logger.info("Successfully incremented Warndatum in SchuelerLeistungsdaten table")
+                return True
+            else:
+                logger.error("Failed to commit transaction")
+                return False
+        else:
+            logger.info("Skipping commit (dry-run mode)")
+            return True
+
+    except Exception as e:
+        logger.error(f"Error incrementing SchuelerLeistungsdaten Warndatum: {e}")
+        try:
+            db.rollback()
+            logger.info("Transaction rolled back")
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback transaction: {rollback_error}")
+        return False
+
+
+def run_all_increments(
+    config_path: str = "config.json",
+    dry_run: bool = False,
+    steps: Optional[list] = None,
+) -> bool:
+    """
+    Run all increment steps in a single orchestrated transaction.
+
+    Args:
+        config_path: Path to config.json
+        dry_run: If True, performs all updates but rolls back at the end
+        steps: Optional list of step keys to execute in order. If None, runs all.
+
+    Returns:
+        True if all selected steps succeed (and committed unless dry_run), False otherwise
+    """
+    # Define available steps in execution order
+    available_steps = [
+        ("schuljahresabschnitte", increment_schuljahresabschnitte_jahr),
+        ("schueler_dates", increment_schueler_dates),
+        ("schueler_abschlussdatum", increment_schueler_abschlussdatum),
+        ("schueler_year_fields", increment_schueler_year_fields),
+        ("schueler_abgaenge_dates", increment_schueler_abgaenge_dates),
+        ("schueler_lernabschnittsdaten_dates", increment_schueler_lernabschnittsdaten_dates),
+        ("schueler_leistungsdaten_warndatum", increment_schueler_leistungsdaten_warndatum),
+    ]
+
+    # Build the final execution list
+    if steps is None:
+        exec_steps = available_steps
+    else:
+        allowed = dict(available_steps)
+        exec_steps = []
+        for key in steps:
+            func = allowed.get(key)
+            if not func:
+                logger.error(f"Unknown step '{key}'. Allowed: {list(allowed.keys())}")
+                return False
+            exec_steps.append((key, func))
+
+    # Create connection with autocommit disabled for transactional control
+    db = create_connection_from_config(config_path)
+    if not db:
+        logger.error("Failed to load DB configuration")
+        return False
+    # Ensure autocommit is disabled during orchestration
+    db.autocommit = False
+    if not db.connect():
+        logger.error("Failed to connect to database")
+        return False
+
+    # Double-ensure autocommit disabled on the underlying connection
+    try:
+        if hasattr(db, "connection") and db.connection:
+            try:
+                db.connection.autocommit = False
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        logger.info(
+            f"Starting orchestrated run with steps: {[key for key, _ in exec_steps]} (dry_run={dry_run})"
+        )
+
+        # Execute each step without committing individually
+        for key, func in exec_steps:
+            logger.info(f"Running step: {key}")
+            ok = func(db, do_commit=False)
+            if not ok:
+                logger.error(f"Step failed: {key}. Rolling back.")
+                db.rollback()
+                return False
+
+        # All steps succeeded
+        if dry_run:
+            logger.info("Dry-run enabled; rolling back all changes.")
+            db.rollback()
+            return True
+        else:
+            if db.commit():
+                logger.info("All steps completed and committed successfully.")
+                return True
+            else:
+                logger.error("Final commit failed; attempting rollback.")
+                db.rollback()
+                return False
+    except Exception as e:
+        logger.error(f"Error during orchestrated run: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return False
+    finally:
+        db.disconnect()
+
 # Example usage
 if __name__ == "__main__":
     # Example 1: Create connection from config.json
     db = create_connection_from_config("config.json")
-    
     if db and db.connect():
-        # Execute a query
         results = db.execute_query("SELECT VERSION()")
         if results:
             print(f"MariaDB Version: {results[0]}")
@@ -634,11 +983,11 @@ if __name__ == "__main__":
             results = db.execute_query("SELECT COUNT(*) FROM Schuljahresabschnitte")
             if results:
                 print(f"Schuljahresabschnitte count: {results[0][0]}")
-    
+
     # Example 3: Increment Jahr in Schuljahresabschnitte
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("Incrementing years in Schuljahresabschnitte...")
-    print("="*70)
+    print("=" * 70)
     db = create_connection_from_config("config.json")
     if db and db.connect():
         if increment_schuljahresabschnitte_jahr(db):
@@ -648,25 +997,20 @@ if __name__ == "__main__":
         db.disconnect()
     else:
         print("✗ Failed to connect to database")
-    
-        # Example 6: Increment integer year fields
-        print("\n" + "="*70)
-        print("Incrementing year fields (JahrZuzug, JahrWechsel_SI, JahrWechsel_SII)...")
-        print("="*70)
-        db = create_connection_from_config("config.json")
-        if db and db.connect():
-            if increment_schueler_year_fields(db):
-                print("✓ Year fields successfully incremented")
-            else:
-                print("✗ Failed to increment year fields")
-            db.disconnect()
-        else:
-            print("✗ Failed to connect to database")
-    
+
+    # Example 10: Orchestrated run (dry-run)
+    print("\n" + "=" * 70)
+    print("Running orchestrated steps (dry-run)...")
+    print("=" * 70)
+    if run_all_increments("config.json", dry_run=True):
+        print("✓ Orchestrated dry-run completed (changes rolled back)")
+    else:
+        print("✗ Orchestrated dry-run failed")
+
     # Example 4: Increment date fields in Schueler
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("Incrementing date fields in Schueler table...")
-    print("="*70)
+    print("=" * 70)
     db = create_connection_from_config("config.json")
     if db and db.connect():
         if increment_schueler_dates(db):
@@ -676,31 +1020,73 @@ if __name__ == "__main__":
         db.disconnect()
     else:
         print("✗ Failed to connect to database")
-    
+
     # Example 5: Increment Abschlussdatum (VARCHAR field)
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("Incrementing Abschlussdatum (VARCHAR) in Schueler table...")
-    print("="*70)
+    print("=" * 70)
     db = create_connection_from_config("config.json")
-    
-        # Example 6: Increment integer year fields
-print("\n" + "="*70)
-print("Incrementing year fields (JahrZuzug, JahrWechsel_SI, JahrWechsel_SII)...")
-print("="*70)
-db = create_connection_from_config("config.json")
-if db and db.connect():
-    if increment_schueler_year_fields(db):
-        print("✓ Year fields successfully incremented")
-    else:
-        print("✗ Failed to increment year fields")
-    db.disconnect()
-else:
-    print("✗ Failed to connect to database")
     if db and db.connect():
         if increment_schueler_abschlussdatum(db):
             print("✓ Abschlussdatum successfully incremented")
         else:
             print("✗ Failed to increment Abschlussdatum")
+        db.disconnect()
+    else:
+        print("✗ Failed to connect to database")
+
+    # Example 6: Increment integer year fields
+    print("\n" + "=" * 70)
+    print("Incrementing year fields (JahrZuzug, JahrWechsel_SI, JahrWechsel_SII)...")
+    print("=" * 70)
+    db = create_connection_from_config("config.json")
+    if db and db.connect():
+        if increment_schueler_year_fields(db):
+            print("✓ Year fields successfully incremented")
+        else:
+            print("✗ Failed to increment year fields")
+        db.disconnect()
+    else:
+        print("✗ Failed to connect to database")
+
+    # Example 7: Increment date fields in SchuelerAbgaenge
+    print("\n" + "=" * 70)
+    print("Incrementing date fields in SchuelerAbgaenge table...")
+    print("=" * 70)
+    db = create_connection_from_config("config.json")
+    if db and db.connect():
+        if increment_schueler_abgaenge_dates(db):
+            print("✓ SchuelerAbgaenge dates successfully incremented")
+        else:
+            print("✗ Failed to increment SchuelerAbgaenge dates")
+        db.disconnect()
+    else:
+        print("✗ Failed to connect to database")
+
+    # Example 8: Increment date fields in SchuelerLernabschnittsdaten
+    print("\n" + "=" * 70)
+    print("Incrementing date fields in SchuelerLernabschnittsdaten table...")
+    print("=" * 70)
+    db = create_connection_from_config("config.json")
+    if db and db.connect():
+        if increment_schueler_lernabschnittsdaten_dates(db):
+            print("✓ SchuelerLernabschnittsdaten dates successfully incremented")
+        else:
+            print("✗ Failed to increment SchuelerLernabschnittsdaten dates")
+        db.disconnect()
+    else:
+        print("✗ Failed to connect to database")
+
+    # Example 9: Increment Warndatum in SchuelerLeistungsdaten
+    print("\n" + "=" * 70)
+    print("Incrementing Warndatum in SchuelerLeistungsdaten table...")
+    print("=" * 70)
+    db = create_connection_from_config("config.json")
+    if db and db.connect():
+        if increment_schueler_leistungsdaten_warndatum(db):
+            print("✓ SchuelerLeistungsdaten Warndatum successfully incremented")
+        else:
+            print("✗ Failed to increment SchuelerLeistungsdaten Warndatum")
         db.disconnect()
     else:
         print("✗ Failed to connect to database")
