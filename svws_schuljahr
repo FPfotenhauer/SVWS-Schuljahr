@@ -1,0 +1,6 @@
+#!/bin/bash
+# Wrapper script to run svws_schuljahr.py with the virtual environment
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/.venv/bin/activate"
+exec "$SCRIPT_DIR/svws_schuljahr.py" "$@"
