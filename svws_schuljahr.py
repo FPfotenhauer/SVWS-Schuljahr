@@ -344,6 +344,275 @@ def increment_schuljahresabschnitte_jahr(db: MariaDBConnection) -> bool:
         return False
 
 
+def increment_schueler_dates(db: MariaDBConnection) -> bool:
+    """
+    Increment all date fields in the Schueler table by 1 year.
+    
+    Updates the following date columns:
+    - Geburtsdatum
+    - Religionsabmeldung
+    - Religionsanmeldung
+    - Schulwechseldatum
+    - BeginnBildungsgang
+    - AnmeldeDatum
+    - EndeEingliederung
+    - EndeAnschlussfoerderung
+    - SprachfoerderungVon
+    - SprachfoerderungBis
+
+    Args:
+        db: MariaDBConnection instance (must be connected)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not db or not db.connection:
+        logger.error("No active database connection")
+        return False
+
+    # Define all date fields to increment
+    date_fields = [
+        "Geburtsdatum",
+        "Religionsabmeldung",
+        "Religionsanmeldung",
+        "Schulwechseldatum",
+        "BeginnBildungsgang",
+        "AnmeldeDatum",
+        "EndeEingliederung",
+        "EndeAnschlussfoerderung",
+        "SprachfoerderungVon",
+        "SprachfoerderungBis"
+    ]
+
+    try:
+        # Count total records
+        count_query = "SELECT COUNT(*) FROM Schueler"
+        count_result = db.execute_query(count_query)
+        total_records = count_result[0][0] if count_result else 0
+        logger.info(f"Processing {total_records} student records in Schueler table")
+
+        # Build the UPDATE statement with DATE_ADD for each field
+        # Only update non-NULL values
+        set_clauses = [
+            f"{field} = IF({field} IS NOT NULL, DATE_ADD({field}, INTERVAL 1 YEAR), NULL)"
+            for field in date_fields
+        ]
+        
+        update_query = f"UPDATE Schueler SET {', '.join(set_clauses)}"
+        
+        logger.info(f"Incrementing {len(date_fields)} date fields by 1 year")
+        
+        # Execute the update
+        affected_rows = db.execute_update(update_query)
+        
+        if affected_rows is not None:
+            logger.info(f"Updated {affected_rows} student records")
+            
+            # Log sample of updated dates for verification
+            sample_query = """
+                SELECT ID, Geburtsdatum, Schulwechseldatum, AnmeldeDatum 
+                FROM Schueler 
+                LIMIT 3
+            """
+            sample_result = db.execute_query(sample_query)
+            if sample_result:
+                logger.info("Sample of updated records:")
+                for row in sample_result:
+                    logger.info(f"  ID: {row[0]}, Geburtsdatum: {row[1]}, Schulwechseldatum: {row[2]}, AnmeldeDatum: {row[3]}")
+        else:
+            logger.error("Failed to update Schueler date fields")
+            return False
+        
+        # Commit the transaction
+        if db.commit():
+            logger.info("Successfully incremented all date fields in Schueler table")
+            return True
+        else:
+            logger.error("Failed to commit transaction")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error incrementing Schueler dates: {e}")
+        try:
+            db.rollback()
+            logger.info("Transaction rolled back")
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback transaction: {rollback_error}")
+        return False
+
+
+def increment_schueler_abschlussdatum(db: MariaDBConnection) -> bool:
+    """
+    Increment the Abschlussdatum field in Schueler table by 1 year.
+    
+    Abschlussdatum is stored as VARCHAR(15) in German date format (DD.MM.YYYY or D.M.YYYY).
+    This function parses the string, adds 1 year, and formats it back to the same format.
+
+    Args:
+        db: MariaDBConnection instance (must be connected)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not db or not db.connection:
+        logger.error("No active database connection")
+        return False
+
+    try:
+        # Count records with Abschlussdatum
+        count_query = "SELECT COUNT(*) FROM Schueler WHERE Abschlussdatum IS NOT NULL AND Abschlussdatum != ''"
+        count_result = db.execute_query(count_query)
+        total_records = count_result[0][0] if count_result else 0
+        logger.info(f"Processing {total_records} student records with Abschlussdatum")
+
+        if total_records == 0:
+            logger.info("No Abschlussdatum values to update")
+            return True
+
+        # Update Abschlussdatum by parsing the German date format
+        # The format is D.M.YYYY or DD.MM.YYYY
+        # We use STR_TO_DATE to parse it, add 1 year, then format it back
+        # Use CONCAT to build the format dynamically to preserve single-digit days/months
+        update_query = """
+            UPDATE Schueler 
+            SET Abschlussdatum = CONCAT(
+                DAY(DATE_ADD(STR_TO_DATE(Abschlussdatum, '%d.%m.%Y'), INTERVAL 1 YEAR)),
+                '.',
+                MONTH(DATE_ADD(STR_TO_DATE(Abschlussdatum, '%d.%m.%Y'), INTERVAL 1 YEAR)),
+                '.',
+                YEAR(DATE_ADD(STR_TO_DATE(Abschlussdatum, '%d.%m.%Y'), INTERVAL 1 YEAR))
+            )
+            WHERE Abschlussdatum IS NOT NULL 
+            AND Abschlussdatum != ''
+            AND Abschlussdatum REGEXP '^[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{4}$'
+        """
+        
+        logger.info("Incrementing Abschlussdatum field by 1 year")
+        
+        # Execute the update
+        affected_rows = db.execute_update(update_query)
+        
+        if affected_rows is not None:
+            logger.info(f"Updated {affected_rows} Abschlussdatum records")
+            
+            # Log sample of updated dates for verification
+            sample_query = """
+                SELECT ID, Abschlussdatum 
+                FROM Schueler 
+                WHERE Abschlussdatum IS NOT NULL AND Abschlussdatum != ''
+                LIMIT 5
+            """
+            sample_result = db.execute_query(sample_query)
+            if sample_result:
+                logger.info("Sample of updated Abschlussdatum values:")
+                for row in sample_result:
+                    logger.info(f"  ID: {row[0]}, Abschlussdatum: {row[1]}")
+        else:
+            logger.error("Failed to update Abschlussdatum field")
+            return False
+        
+        # Commit the transaction
+        if db.commit():
+            logger.info("Successfully incremented Abschlussdatum in Schueler table")
+            return True
+        else:
+            logger.error("Failed to commit transaction")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error incrementing Abschlussdatum: {e}")
+        try:
+            db.rollback()
+            logger.info("Transaction rolled back")
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback transaction: {rollback_error}")
+        return False
+
+
+def increment_schueler_year_fields(db: MariaDBConnection) -> bool:
+    """
+    Increment integer year fields in the Schueler table by 1.
+    
+    Updates the following integer year columns:
+    - JahrZuzug
+    - JahrWechsel_SI
+    - JahrWechsel_SII
+
+    Args:
+        db: MariaDBConnection instance (must be connected)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not db or not db.connection:
+        logger.error("No active database connection")
+        return False
+
+    # Define all year fields to increment
+    year_fields = [
+        "JahrZuzug",
+        "JahrWechsel_SI",
+        "JahrWechsel_SII"
+    ]
+
+    try:
+        # Count total records
+        count_query = "SELECT COUNT(*) FROM Schueler"
+        count_result = db.execute_query(count_query)
+        total_records = count_result[0][0] if count_result else 0
+        logger.info(f"Processing {total_records} student records in Schueler table")
+
+        # Build the UPDATE statement for integer year fields
+        # Only update non-NULL values
+        set_clauses = [
+            f"{field} = IF({field} IS NOT NULL, {field} + 1, NULL)"
+            for field in year_fields
+        ]
+        
+        update_query = f"UPDATE Schueler SET {', '.join(set_clauses)}"
+        
+        logger.info(f"Incrementing {len(year_fields)} year fields by 1")
+        
+        # Execute the update
+        affected_rows = db.execute_update(update_query)
+        
+        if affected_rows is not None:
+            logger.info(f"Updated {affected_rows} student records")
+            
+            # Log sample of updated years for verification
+            sample_query = """
+                SELECT ID, JahrZuzug, JahrWechsel_SI, JahrWechsel_SII 
+                FROM Schueler 
+                WHERE JahrZuzug IS NOT NULL OR JahrWechsel_SI IS NOT NULL OR JahrWechsel_SII IS NOT NULL
+                LIMIT 5
+            """
+            sample_result = db.execute_query(sample_query)
+            if sample_result:
+                logger.info("Sample of updated records:")
+                for row in sample_result:
+                    logger.info(f"  ID: {row[0]}, JahrZuzug: {row[1]}, JahrWechsel_SI: {row[2]}, JahrWechsel_SII: {row[3]}")
+        else:
+            logger.error("Failed to update Schueler year fields")
+            return False
+        
+        # Commit the transaction
+        if db.commit():
+            logger.info("Successfully incremented all year fields in Schueler table")
+            return True
+        else:
+            logger.error("Failed to commit transaction")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error incrementing Schueler year fields: {e}")
+        try:
+            db.rollback()
+            logger.info("Transaction rolled back")
+        except Exception as rollback_error:
+            logger.error(f"Failed to rollback transaction: {rollback_error}")
+        return False
+
+
 # Example usage
 if __name__ == "__main__":
     # Example 1: Create connection from config.json
@@ -376,6 +645,62 @@ if __name__ == "__main__":
             print("✓ Years successfully incremented")
         else:
             print("✗ Failed to increment years")
+        db.disconnect()
+    else:
+        print("✗ Failed to connect to database")
+    
+        # Example 6: Increment integer year fields
+        print("\n" + "="*70)
+        print("Incrementing year fields (JahrZuzug, JahrWechsel_SI, JahrWechsel_SII)...")
+        print("="*70)
+        db = create_connection_from_config("config.json")
+        if db and db.connect():
+            if increment_schueler_year_fields(db):
+                print("✓ Year fields successfully incremented")
+            else:
+                print("✗ Failed to increment year fields")
+            db.disconnect()
+        else:
+            print("✗ Failed to connect to database")
+    
+    # Example 4: Increment date fields in Schueler
+    print("\n" + "="*70)
+    print("Incrementing date fields in Schueler table...")
+    print("="*70)
+    db = create_connection_from_config("config.json")
+    if db and db.connect():
+        if increment_schueler_dates(db):
+            print("✓ Student dates successfully incremented")
+        else:
+            print("✗ Failed to increment student dates")
+        db.disconnect()
+    else:
+        print("✗ Failed to connect to database")
+    
+    # Example 5: Increment Abschlussdatum (VARCHAR field)
+    print("\n" + "="*70)
+    print("Incrementing Abschlussdatum (VARCHAR) in Schueler table...")
+    print("="*70)
+    db = create_connection_from_config("config.json")
+    
+        # Example 6: Increment integer year fields
+print("\n" + "="*70)
+print("Incrementing year fields (JahrZuzug, JahrWechsel_SI, JahrWechsel_SII)...")
+print("="*70)
+db = create_connection_from_config("config.json")
+if db and db.connect():
+    if increment_schueler_year_fields(db):
+        print("✓ Year fields successfully incremented")
+    else:
+        print("✗ Failed to increment year fields")
+    db.disconnect()
+else:
+    print("✗ Failed to connect to database")
+    if db and db.connect():
+        if increment_schueler_abschlussdatum(db):
+            print("✓ Abschlussdatum successfully incremented")
+        else:
+            print("✗ Failed to increment Abschlussdatum")
         db.disconnect()
     else:
         print("✗ Failed to connect to database")

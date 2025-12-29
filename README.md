@@ -48,9 +48,9 @@ Die Datei `config.json` enthält die Datenbankverbindungskonfiguration:
   "database": {
     "host": "localhost",
     "port": 3306,
-    "user": "anonym",
-    "password": "anonym",
-    "database": "anonym",
+    "user": "dbuser",
+    "password": "",
+    "database": "svws",
     "autocommit": true
   },
   "logging": {
@@ -147,6 +147,40 @@ with MariaDBConnection(host="localhost", user="root", password="password", datab
 **Rückgabewert:**
 - `True` bei Erfolg
 - `False` bei Fehler (mit automatischem Rollback)
+
+### Schueler-Datumsfelder-Inkrementierung
+
+`increment_schueler_dates(db)`: Erhöht alle Datumsfelder in der Tabelle Schueler um 1 Jahr.
+
+**Betroffene Spalten:**
+- Geburtsdatum, Religionsabmeldung, Religionsanmeldung, Schulwechseldatum
+- BeginnBildungsgang, AnmeldeDatum, EndeEingliederung, EndeAnschlussfoerderung
+- SprachfoerderungVon, SprachfoerderungBis
+
+**Eigenschaften:**
+- Nutzt `DATE_ADD` für korrekte Jahresverschiebung
+- NULL-sicher (NULL bleibt NULL)
+- Ein Bulk-Update für alle Felder
+
+### Schueler-Abschlussdatum (VARCHAR) Inkrementierung
+
+`increment_schueler_abschlussdatum(db)`: Erhöht das Feld Abschlussdatum (VARCHAR, Format D.M.YYYY/ DD.MM.YYYY) um 1 Jahr.
+
+**Eigenschaften:**
+- Parsen mit `STR_TO_DATE`, Jahresinkrement via `DATE_ADD`
+- Ausgabe im ursprünglichen deutschen Datumsformat
+- Nur Werte, die das erwartete Datumsregex erfüllen, werden angepasst
+
+### Schueler-Jahresfelder (Integer) Inkrementierung
+
+`increment_schueler_year_fields(db)`: Erhöht Integer-Jahresfelder um 1.
+
+**Betroffene Spalten:**
+- JahrZuzug, JahrWechsel_SI, JahrWechsel_SII
+
+**Eigenschaften:**
+- NULL-sicher (NULL bleibt NULL)
+- Ein Bulk-Update für alle drei Felder
 
 ## Logging
 
