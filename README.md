@@ -68,6 +68,8 @@ Die Datei `config.json` enthält die Datenbankverbindungskonfiguration:
 - `database`: Datenbankname
 - `autocommit`: Automatisches Commit nach Queries (Standard: true)
 
+Hinweis: Wenn `user`, `password` oder `database` in der `config.json` fehlen oder `null`/leer sind, fragt das Tool diese Werte beim Start interaktiv im Terminal ab (Passwort verdeckt). Die Eingaben werden nicht in die `config.json` zurückgeschrieben.
+
 ## Verwendung
 
 ### Grundlegende Verwendung
@@ -175,7 +177,7 @@ with MariaDBConnection(host="localhost", user="root", password="password", datab
 
 **Betroffene Spalten:**
 - Geburtsdatum, Religionsabmeldung, Religionsanmeldung, Schulwechseldatum
-- BeginnBildungsgang, AnmeldeDatum, EndeEingliederung, EndeAnschlussfoerderung
+- BeginnBildungsgang, AnmeldeDatum, Aufnahmedatum, EndeEingliederung, EndeAnschlussfoerderung
 - SprachfoerderungVon, SprachfoerderungBis
 
 **Eigenschaften:**

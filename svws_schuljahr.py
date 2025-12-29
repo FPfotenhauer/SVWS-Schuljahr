@@ -8,6 +8,7 @@ import os
 import sys
 import json
 import argparse
+import getpass
 from typing import Optional, Dict, Any, List, Tuple
 import logging
 from pathlib import Path
@@ -235,7 +236,23 @@ def create_connection_from_config(config_path: str = "config.json") -> Optional[
     try:
         config = load_config(config_path)
         db_config = config.get("database", {})
-        
+
+        # Prompt interactively if user/password/database are missing or NULL/empty in config
+        def _needs_prompt(val: Any) -> bool:
+            return val is None or (isinstance(val, str) and val.strip() == "")
+
+        if _needs_prompt(db_config.get("user")):
+            logger.info("Database user not set in config; prompting in terminal …")
+            db_config["user"] = input("MariaDB user: ").strip()
+
+        if _needs_prompt(db_config.get("password")):
+            logger.info("Database password not set in config; prompting in terminal …")
+            db_config["password"] = getpass.getpass("MariaDB password: ")
+
+        if _needs_prompt(db_config.get("database")):
+            logger.info("Database name not set in config; prompting in terminal …")
+            db_config["database"] = input("MariaDB database name: ").strip()
+
         return MariaDBConnection(
             host=db_config.get("host", "localhost"),
             port=db_config.get("port", 3306),
@@ -427,6 +444,7 @@ def increment_schueler_dates(db: MariaDBConnection, do_commit: bool = True) -> b
     - Schulwechseldatum
     - BeginnBildungsgang
     - AnmeldeDatum
+    - Aufnahmedatum
     - EndeEingliederung
     - EndeAnschlussfoerderung
     - SprachfoerderungVon
@@ -450,6 +468,7 @@ def increment_schueler_dates(db: MariaDBConnection, do_commit: bool = True) -> b
         "Schulwechseldatum",
         "BeginnBildungsgang",
         "AnmeldeDatum",
+        "Aufnahmedatum",
         "EndeEingliederung",
         "EndeAnschlussfoerderung",
         "SprachfoerderungVon",
@@ -482,7 +501,7 @@ def increment_schueler_dates(db: MariaDBConnection, do_commit: bool = True) -> b
             
             # Log sample of updated dates for verification
             sample_query = """
-                SELECT ID, Geburtsdatum, Schulwechseldatum, AnmeldeDatum 
+                SELECT ID, Geburtsdatum, Schulwechseldatum, AnmeldeDatum, Aufnahmedatum
                 FROM Schueler 
                 LIMIT 3
             """
@@ -490,7 +509,7 @@ def increment_schueler_dates(db: MariaDBConnection, do_commit: bool = True) -> b
             if sample_result:
                 logger.info("Sample of updated records:")
                 for row in sample_result:
-                    logger.info(f"  ID: {row[0]}, Geburtsdatum: {row[1]}, Schulwechseldatum: {row[2]}, AnmeldeDatum: {row[3]}")
+                    logger.info(f"  ID: {row[0]}, Geburtsdatum: {row[1]}, Schulwechseldatum: {row[2]}, AnmeldeDatum: {row[3]}, Aufnahmedatum: {row[4]}")
         else:
             logger.error("Failed to update Schueler date fields")
             return False
