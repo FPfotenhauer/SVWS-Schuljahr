@@ -104,6 +104,27 @@ Oder mit der virtuellen Umgebung:
 
 ## Funktionalität
 
+### CLI
+
+Ab jetzt steht eine kleine CLI zur Verfügung:
+
+```bash
+# Schritte anzeigen
+.venv/bin/python svws_schuljahr.py list-steps
+
+# Alle Schritte als Dry-Run (Rollback am Ende)
+.venv/bin/python svws_schuljahr.py run --dry-run
+
+# Nur bestimmte Schritte ausführen (mit Commit)
+.venv/bin/python svws_schuljahr.py run --steps schueler_dates --steps schueler_abschlussdatum
+
+# Alternative: Komma-separiert
+.venv/bin/python svws_schuljahr.py run --steps schueler_dates,schueler_abschlussdatum
+
+# Anderes Config-File
+.venv/bin/python svws_schuljahr.py run --config path/to/config.json --dry-run
+```
+
 ### MariaDBConnection Klasse
 
 Verwaltet die Verbindung zur MariaDB-Datenbank:
@@ -231,6 +252,12 @@ with MariaDBConnection(host="localhost", user="root", password="password", datab
 - `schueler_abgaenge_dates`
 - `schueler_lernabschnittsdaten_dates`
 - `schueler_leistungsdaten_warndatum`
+- `schueler_einzelleistungen_datum`
+- `schueler_fehlstunden_datum`
+- `schueler_vermerke_datum`
+- `schueler_merkmale_dates`
+- `schueler_foerderempfehlungen_dates`
+- `schueler_allgadr_dates`
 
 **Beispiel (Dry-Run):**
 
@@ -258,6 +285,60 @@ print("OK" if ok else "Fehler")
 
 **Eigenschaften:**
 - Nutzt `DATE_ADD(Warndatum, INTERVAL 1 YEAR)`
+- NULL-sicher (NULL bleibt NULL)
+- Liefert Beispielwerte im Log zur Verifikation
+
+### SchuelerEinzelleistungen – Datum (Date) Inkrementierung
+
+`increment_schueler_einzelleistungen_datum(db, do_commit=True)`: Erhöht das Feld `Datum` in der Tabelle `SchuelerEinzelleistungen` um 1 Jahr (nur wenn nicht NULL).
+
+**Eigenschaften:**
+- Nutzt `DATE_ADD(Datum, INTERVAL 1 YEAR)`
+- NULL-sicher (NULL bleibt NULL)
+- Liefert Beispielwerte im Log zur Verifikation
+
+### SchuelerFehlstunden – Datum (Date) Inkrementierung
+
+`increment_schueler_fehlstunden_datum(db, do_commit=True)`: Erhöht das Feld `Datum` in der Tabelle `SchuelerFehlstunden` um 1 Jahr (nur wenn nicht NULL).
+
+**Eigenschaften:**
+- Nutzt `DATE_ADD(Datum, INTERVAL 1 YEAR)`
+- NULL-sicher (NULL bleibt NULL)
+- Liefert Beispielwerte im Log zur Verifikation
+
+### SchuelerVermerke – Datum (Date) Inkrementierung
+
+`increment_schueler_vermerke_datum(db, do_commit=True)`: Erhöht das Feld `Datum` in der Tabelle `SchuelerVermerke` um 1 Jahr (nur wenn nicht NULL).
+
+**Eigenschaften:**
+- Nutzt `DATE_ADD(Datum, INTERVAL 1 YEAR)`
+- NULL-sicher (NULL bleibt NULL)
+- Liefert Beispielwerte im Log zur Verifikation
+
+### SchuelerMerkmale – DatumVon/DatumBis (Date) Inkrementierung
+
+`increment_schueler_merkmale_dates(db, do_commit=True)`: Erhöht die Felder `DatumVon` und `DatumBis` in der Tabelle `SchuelerMerkmale` um 1 Jahr (nur wenn nicht NULL).
+
+**Eigenschaften:**
+- Nutzt `DATE_ADD(..., INTERVAL 1 YEAR)`
+- NULL-sicher (NULL bleibt NULL)
+- Bulk-Update beider Felder mit Beispiel-Logging
+
+### SchuelerFoerderempfehlungen – Mehrere Datumsfelder Inkrementierung
+
+`increment_schueler_foerderempfehlungen_dates(db, do_commit=True)`: Erhöht die Felder `DatumAngelegt`, `Zeitrahmen_von_Datum`, `Zeitrahmen_bis_Datum`, `Ueberpruefung_Datum`, `Naechstes_Beratungsgespraech` um 1 Jahr (nur wenn nicht NULL).
+
+**Eigenschaften:**
+- Nutzt `DATE_ADD(..., INTERVAL 1 YEAR)` für alle aufgeführten Felder
+- NULL-sicher (NULL bleibt NULL)
+- Liefert Beispielwerte im Log zur Verifikation
+
+### Schueler_AllgAdr – Vertragsbeginn/Vertragsende (Date) Inkrementierung
+
+`increment_schueler_allgadr_dates(db, do_commit=True)`: Erhöht die Felder `Vertragsbeginn` und `Vertragsende` in der Tabelle `Schueler_AllgAdr` um 1 Jahr (nur wenn nicht NULL).
+
+**Eigenschaften:**
+- Nutzt `DATE_ADD(..., INTERVAL 1 YEAR)`
 - NULL-sicher (NULL bleibt NULL)
 - Liefert Beispielwerte im Log zur Verifikation
 
