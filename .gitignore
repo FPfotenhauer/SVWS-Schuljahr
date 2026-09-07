@@ -1,6 +1,8 @@
 # config file
 config.json
-settings.json
+
+# Editor settings
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
