@@ -95,13 +95,13 @@ if db and db.connect():
 Das Skript kann direkt ausgeführt werden und führt automatisch Tests durch:
 
 ```bash
-python3 svws_schuljahr.py
+python3 svws_schuljahr.py run
 ```
 
 Oder mit der virtuellen Umgebung:
 
 ```bash
-.venv/bin/python svws_schuljahr.py
+.venv/bin/python svws_schuljahr.py run
 ```
 
 ## Funktionalität
